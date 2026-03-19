@@ -1,0 +1,49 @@
+name: Promote to Production
+
+on:
+  workflow_dispatch:
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Read staging version
+        id: version
+        run: echo "TAG=$(cat last_version_staging.txt)" >> $GITHUB_ENV
+
+      - name: Tag staging image for production
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          docker pull $ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/myapp-staging:${TAG}
+          docker tag $ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/myapp-staging:${TAG} \
+                     $ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/myapp:${TAG}
+
+      - name: Login to ECR
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
+            | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+
+      - name: Push production image
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          docker push $ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/myapp:${TAG}
+
+      - name: SSH into production and deploy
+        run: |
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 --decode > cicd_key
+          chmod 600 cicd_key
+
+          ssh -o StrictHostKeyChecking=no -i cicd_key ec2-user@${{ secrets.EC2_PRODUCTION_HOST }} \
+            "echo ${TAG} > last_version.txt && ./scripts/deploy.sh"

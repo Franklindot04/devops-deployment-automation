@@ -1,0 +1,53 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Generate version tag
+        id: version
+        run: echo "TAG=$(date +'%Y%m%d%H%M')" >> $GITHUB_ENV
+
+      - name: Build Docker image
+        run: |
+          docker build -t myapp:${TAG} .
+
+      - name: Tag for ECR
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          docker tag myapp:${TAG} $ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/myapp-staging:${TAG}
+
+      - name: Login to ECR
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
+            | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+
+      - name: Push to ECR
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          docker push $ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/myapp-staging:${TAG}
+
+      - name: SSH into staging and deploy
+        run: |
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 --decode > cicd_key
+          chmod 600 cicd_key
+
+          ssh -o StrictHostKeyChecking=no -i cicd_key ec2-user@${{ secrets.EC2_STAGING_HOST }} \
+            "echo ${TAG} > last_version_staging.txt && ./scripts/deploy_staging.sh"
