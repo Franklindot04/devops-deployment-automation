@@ -25,7 +25,7 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t myapp:${{ env.TAG }} .
+          docker build -f app/Dockerfile -t myapp:${{ env.TAG }} app
 
       - name: Tag for ECR
         run: |
