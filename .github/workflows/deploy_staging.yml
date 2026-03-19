@@ -1,55 +1,72 @@
-name: Deploy to Staging
+#!/bin/bash
+set -e
 
-on:
-  push:
-    branches:
-      - main
+VERSION=$(cat last_version_staging.txt)
+PREVIOUS_VERSION=$(cat previous_version_staging.txt 2>/dev/null || echo "none")
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
+AWS_ACCOUNT_ID="787124622426"
+AWS_REGION="eu-north-1"
+ECR_REPO="myapp-staging"
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+APP_MESSAGE="Hello from STAGING!"
+APP_ENV="staging"
 
-      - name: Set up AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+echo "Deploying version: $VERSION"
+echo "Previous version: $PREVIOUS_VERSION"
 
-      - name: Generate version tag
-        run: echo "TAG=$(date +'%Y%m%d%H%M')" >> $GITHUB_ENV
+echo "Logging in to ECR..."
+aws ecr get-login-password --region $AWS_REGION \
+  | docker login --username AWS --password-stdin \
+    $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
-      - name: Build Docker image
-        run: |
-          docker build -f app/Dockerfile -t myapp:${{ env.TAG }} app
+echo "Pulling new image..."
+docker pull $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$VERSION
 
-      - name: Tag for ECR
-        run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          docker tag "myapp:${{ env.TAG }}" \
-            "$ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/myapp-staging:${{ env.TAG }}"
+echo "Stopping old container..."
+docker stop myapp || true
+docker rm myapp || true
 
-      - name: Login to ECR
-        run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
-            | docker login --username AWS --password-stdin \
-              "$ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com"
+echo "Creating log directory..."
+sudo mkdir -p /var/log/myapp
+sudo chown ec2-user:ec2-user /var/log/myapp
 
-      - name: Push to ECR
-        run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          docker push \
-            "$ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/myapp-staging:${{ env.TAG }}"
+echo "Starting new container..."
+docker run -d --name myapp \
+  -p 80:80 \
+  -v /var/log/myapp:/logs \
+  -e APP_MESSAGE="$APP_MESSAGE" \
+  -e APP_ENV="$APP_ENV" \
+  $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$VERSION
 
-      - name: SSH into staging and deploy
-        run: |
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > cicd_key
-          chmod 600 cicd_key
+echo "Waiting for app to start..."
+sleep 5
 
-          ssh -o StrictHostKeyChecking=no -i cicd_key ec2-user@${{ secrets.EC2_STAGING_HOST }} \
-            "cd devops-deployment-automation && echo '${{ env.TAG }}' > last_version_staging.txt && ./scripts/deploy_staging.sh"
+echo "Running health check..."
+if curl -s http://localhost/health | grep -q "ok"; then
+    echo "Health check passed. Deployment successful."
+else
+    echo "Health check FAILED. Rolling back to previous version: $PREVIOUS_VERSION"
+
+    if [ "$PREVIOUS_VERSION" = "none" ]; then
+        echo "No previous version available. Cannot roll back."
+        exit 1
+    fi
+
+    echo "Pulling previous image..."
+    docker pull $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$PREVIOUS_VERSION
+
+    echo "Stopping failed container..."
+    docker stop myapp || true
+    docker rm myapp || true
+
+    echo "Starting previous version..."
+    docker run -d --name myapp \
+      -p 80:80 \
+      $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$PREVIOUS_VERSION
+
+    echo "Rollback complete."
+    exit 1
+fi
+
+echo "Updating version history..."
+echo $VERSION > previous_version_staging.txt
