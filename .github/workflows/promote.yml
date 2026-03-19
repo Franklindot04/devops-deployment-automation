@@ -20,7 +20,7 @@ jobs:
 
       - name: Read staging version from server
         run: |
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 --decode > cicd_key
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > cicd_key
           chmod 600 cicd_key
 
           TAG=$(ssh -o StrictHostKeyChecking=no -i cicd_key ec2-user@${{ secrets.EC2_STAGING_HOST }} "cat last_version_staging.txt")
@@ -30,19 +30,23 @@ jobs:
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
-            | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+            | docker login --username AWS --password-stdin \
+              "$ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com"
 
       - name: Pull and retag staging image for production
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          docker pull $ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/myapp-staging:${TAG}
-          docker tag $ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/myapp-staging:${TAG} \
-                     $ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/myapp:${TAG}
+          docker pull \
+            "$ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/myapp-staging:${{ env.TAG }}"
+          docker tag \
+            "$ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/myapp-staging:${{ env.TAG }}" \
+            "$ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/myapp:${{ env.TAG }}"
 
       - name: Push production image
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          docker push $ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/myapp:${TAG}
+          docker push \
+            "$ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/myapp:${{ env.TAG }}"
 
       - name: SSH into production and deploy
         run: |
@@ -50,4 +54,4 @@ jobs:
           chmod 600 cicd_key
 
           ssh -o StrictHostKeyChecking=no -i cicd_key ec2-user@${{ secrets.EC2_PRODUCTION_HOST }} \
-            "echo ${TAG} > last_version.txt && ./scripts/deploy.sh"
+            "echo '${{ env.TAG }}' > last_version.txt && ./scripts/deploy.sh"

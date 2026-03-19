@@ -30,18 +30,21 @@ jobs:
       - name: Tag for ECR
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          docker tag "myapp:${{ env.TAG }}" "$ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/myapp-staging:${{ env.TAG }}"
+          docker tag "myapp:${{ env.TAG }}" \
+            "$ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/myapp-staging:${{ env.TAG }}"
 
       - name: Login to ECR
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
-            | docker login --username AWS --password-stdin "$ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com"
+            | docker login --username AWS --password-stdin \
+              "$ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com"
 
       - name: Push to ECR
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          docker push "$ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/myapp-staging:${{ env.TAG }}"
+          docker push \
+            "$ACCOUNT_ID.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/myapp-staging:${{ env.TAG }}"
 
       - name: SSH into staging and deploy
         run: |
