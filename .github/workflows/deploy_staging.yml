@@ -45,7 +45,7 @@ jobs:
 
       - name: SSH into staging and deploy
         run: |
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 --decode > cicd_key
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > cicd_key
           chmod 600 cicd_key
 
           ssh -o StrictHostKeyChecking=no -i cicd_key ec2-user@${{ secrets.EC2_STAGING_HOST }} \
