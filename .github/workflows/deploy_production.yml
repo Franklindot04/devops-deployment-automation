@@ -23,13 +23,13 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -f app/Dockerfile -t myapp:${{ env.TAG }} app
+          docker build -f app/Dockerfile -t myapp-production:${{ env.TAG }} app
 
       - name: Tag for ECR
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          docker tag "myapp:${{ env.TAG }}" \
-            "$ACCOUNT_ID.dkr.ecr.eu-north-1.amazonaws.com/myapp:${{ env.TAG }}"
+          docker tag "myapp-production:${{ env.TAG }}" \
+            "$ACCOUNT_ID.dkr.ecr.eu-north-1.amazonaws.com/myapp-production:${{ env.TAG }}"
 
       - name: Login to ECR
         run: |
@@ -42,7 +42,7 @@ jobs:
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           docker push \
-            "$ACCOUNT_ID.dkr.ecr.eu-north-1.amazonaws.com/myapp:${{ env.TAG }}"
+            "$ACCOUNT_ID.dkr.ecr.eu-north-1.amazonaws.com/myapp-production:${{ env.TAG }}"
 
       - name: Copy version file to EC2
         run: |

@@ -39,13 +39,13 @@ jobs:
 
           docker tag \
             "$ACCOUNT_ID.dkr.ecr.eu-north-1.amazonaws.com/myapp-staging:${{ env.TAG }}" \
-            "$ACCOUNT_ID.dkr.ecr.eu-north-1.amazonaws.com/myapp:${{ env.TAG }}"
+            "$ACCOUNT_ID.dkr.ecr.eu-north-1.amazonaws.com/myapp-production:${{ env.TAG }}"
 
       - name: Push production image
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           docker push \
-            "$ACCOUNT_ID.dkr.ecr.eu-north-1.amazonaws.com/myapp:${{ env.TAG }}"
+            "$ACCOUNT_ID.dkr.ecr.eu-north-1.amazonaws.com/myapp-production:${{ env.TAG }}"
 
       - name: Copy version file to production EC2
         run: |
