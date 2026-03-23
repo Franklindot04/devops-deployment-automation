@@ -22,4 +22,4 @@ def read_root():
 @app.get("/health")
 def health():
     logger.info("Health check called")
-    return {"status": ""broken""}
+    return {"status": "ok"}
