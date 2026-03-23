@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       # Notify Slack: Staging deploy started
       - name: Slack - Staging Deploy Started
@@ -38,10 +40,21 @@ jobs:
         run: |
           VERSION=$(date +'%Y%m%d%H%M')
           echo $VERSION > last_version_staging.txt
+
           aws ecr get-login-password --region eu-north-1 | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.eu-north-1.amazonaws.com
+
           docker build -t myapp-staging:$VERSION ./app
           docker tag myapp-staging:$VERSION ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.eu-north-1.amazonaws.com/myapp-staging:$VERSION
           docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.eu-north-1.amazonaws.com/myapp-staging:$VERSION
+
+      # ⭐ NEW: Commit updated version file back to GitHub
+      - name: Commit updated version file
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add last_version_staging.txt
+          git commit -m "Update staging version to $(cat last_version_staging.txt)"
+          git push
 
       - name: Copy version file to staging EC2
         run: |
