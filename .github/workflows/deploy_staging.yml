@@ -39,7 +39,7 @@ jobs:
           VERSION=$(date +'%Y%m%d%H%M')
           echo $VERSION > last_version_staging.txt
           aws ecr get-login-password --region eu-north-1 | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.eu-north-1.amazonaws.com
-          docker build -t myapp-staging:$VERSION .
+          docker build -t myapp-staging:$VERSION ./app
           docker tag myapp-staging:$VERSION ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.eu-north-1.amazonaws.com/myapp-staging:$VERSION
           docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.eu-north-1.amazonaws.com/myapp-staging:$VERSION
 
