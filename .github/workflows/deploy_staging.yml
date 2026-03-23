@@ -6,59 +6,79 @@ on:
       - main
 
 jobs:
-  deploy-staging:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v3
 
+      # Notify Slack: Staging deploy started
+      - name: Slack - Staging Deploy Started
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+          --data "{
+            \"attachments\": [
+              {
+                \"color\": \"#439FE0\",
+                \"text\": \"🚀 *Staging Deployment Started*\nRepository: devops-deployment-automation\nEnvironment: *STAGING*\"
+              }
+            ]
+          }" \
+          ${{ secrets.SLACK_WEBHOOK_URL }}
+
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: eu-north-1
 
-      - name: Generate version tag
-        run: echo "TAG=$(date +'%Y%m%d%H%M')" >> $GITHUB_ENV
-
-      - name: Build Docker image
+      - name: Build and push Docker image
         run: |
-          docker build -f app/Dockerfile -t myapp-staging:${{ env.TAG }} app
-
-      - name: Tag for ECR
-        run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          docker tag "myapp-staging:${{ env.TAG }}" \
-            "$ACCOUNT_ID.dkr.ecr.eu-north-1.amazonaws.com/myapp-staging:${{ env.TAG }}"
-
-      - name: Login to ECR
-        run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          aws ecr get-login-password --region eu-north-1 \
-            | docker login --username AWS --password-stdin \
-              "$ACCOUNT_ID.dkr.ecr.eu-north-1.amazonaws.com"
-
-      - name: Push to ECR
-        run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          docker push \
-            "$ACCOUNT_ID.dkr.ecr.eu-north-1.amazonaws.com/myapp-staging:${{ env.TAG }}"
+          VERSION=$(date +'%Y%m%d%H%M')
+          echo $VERSION > last_version_staging.txt
+          aws ecr get-login-password --region eu-north-1 | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.eu-north-1.amazonaws.com
+          docker build -t myapp-staging:$VERSION .
+          docker tag myapp-staging:$VERSION ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.eu-north-1.amazonaws.com/myapp-staging:$VERSION
+          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.eu-north-1.amazonaws.com/myapp-staging:$VERSION
 
       - name: Copy version file to staging EC2
         run: |
-          echo "${{ env.TAG }}" > last_version_staging.txt
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > cicd_key
+          echo "${{ secrets.STAGING_SSH_KEY }}" > cicd_key
           chmod 600 cicd_key
+          scp -o StrictHostKeyChecking=no -i cicd_key last_version_staging.txt ec2-user@${{ secrets.EC2_STAGING_HOST }}:/home/ec2-user/devops-deployment-automation/
 
-          scp -o StrictHostKeyChecking=no -i cicd_key last_version_staging.txt \
-            ec2-user@${{ secrets.EC2_STAGING_HOST }}:/home/ec2-user/devops-deployment-automation/
-
-      - name: SSH into staging and deploy
+      - name: Deploy on staging EC2
         run: |
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > cicd_key
-          chmod 600 cicd_key
+          ssh -o StrictHostKeyChecking=no -i cicd_key ec2-user@${{ secrets.EC2_STAGING_HOST }} "cd devops-deployment-automation/scripts && ./deploy.sh"
 
-          ssh -o StrictHostKeyChecking=no -i cicd_key ec2-user@${{ secrets.EC2_STAGING_HOST }} \
-            "cd devops-deployment-automation && ./scripts/deploy_staging.sh"
+      # Notify Slack: Staging deploy success
+      - name: Slack - Staging Deploy Success
+        if: success()
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+          --data "{
+            \"attachments\": [
+              {
+                \"color\": \"good\",
+                \"text\": \"✅ *Staging Deployment Successful*\nEnvironment: *STAGING*\"
+              }
+            ]
+          }" \
+          ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      # Notify Slack: Staging deploy failed
+      - name: Slack - Staging Deploy Failed
+        if: failure()
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+          --data "{
+            \"attachments\": [
+              {
+                \"color\": \"danger\",
+                \"text\": \"❌ *Staging Deployment Failed*\nEnvironment: *STAGING*\"
+              }
+            ]
+          }" \
+          ${{ secrets.SLACK_WEBHOOK_URL }}

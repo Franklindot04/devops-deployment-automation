@@ -8,58 +8,71 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v3
 
+      # Notify Slack: Promote started
+      - name: Slack - Promote Started
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+          --data "{
+            \"attachments\": [
+              {
+                \"color\": \"#439FE0\",
+                \"text\": \"🚀 *Promote to Production Started*\nEnvironment: *PRODUCTION*\"
+              }
+            ]
+          }" \
+          ${{ secrets.SLACK_WEBHOOK_URL }}
+
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: eu-north-1
 
-      - name: Read last staging version
+      - name: Read staging version
         run: |
-          TAG=$(cat last_version_staging.txt)
-          echo "TAG=$TAG" >> $GITHUB_ENV
-
-      - name: Login to ECR
-        run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          aws ecr get-login-password --region eu-north-1 \
-            | docker login --username AWS --password-stdin \
-              "$ACCOUNT_ID.dkr.ecr.eu-north-1.amazonaws.com"
-
-      - name: Pull staging image and retag for production
-        run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-
-          docker pull \
-            "$ACCOUNT_ID.dkr.ecr.eu-north-1.amazonaws.com/myapp-staging:${{ env.TAG }}"
-
-          docker tag \
-            "$ACCOUNT_ID.dkr.ecr.eu-north-1.amazonaws.com/myapp-staging:${{ env.TAG }}" \
-            "$ACCOUNT_ID.dkr.ecr.eu-north-1.amazonaws.com/myapp-production:${{ env.TAG }}"
-
-      - name: Push production image
-        run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          docker push \
-            "$ACCOUNT_ID.dkr.ecr.eu-north-1.amazonaws.com/myapp-production:${{ env.TAG }}"
+          VERSION=$(cat last_version_staging.txt)
+          echo $VERSION > last_version_production.txt
 
       - name: Copy version file to production EC2
         run: |
-          echo "${{ env.TAG }}" > last_version_production.txt
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > cicd_key
+          echo "${{ secrets.PRODUCTION_SSH_KEY }}" > cicd_key
           chmod 600 cicd_key
+          scp -o StrictHostKeyChecking=no -i cicd_key last_version_production.txt ec2-user@${{ secrets.EC2_PRODUCTION_HOST }}:/home/ec2-user/devops-deployment-automation/
 
-          scp -o StrictHostKeyChecking=no -i cicd_key last_version_production.txt \
-            ec2-user@${{ secrets.EC2_PRODUCTION_HOST }}:/home/ec2-user/devops-deployment-automation/
-
-      - name: SSH into production and deploy
+      - name: Deploy on production EC2
         run: |
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > cicd_key
-          chmod 600 cicd_key
+          ssh -o StrictHostKeyChecking=no -i cicd_key ec2-user@${{ secrets.EC2_PRODUCTION_HOST }} "cd devops-deployment-automation/scripts && ./deploy.sh"
 
-          ssh -o StrictHostKeyChecking=no -i cicd_key ec2-user@${{ secrets.EC2_PRODUCTION_HOST }} \
-            "cd devops-deployment-automation && ./scripts/deploy.sh"
+      # Notify Slack: Promote success
+      - name: Slack - Promote Success
+        if: success()
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+          --data "{
+            \"attachments\": [
+              {
+                \"color\": \"good\",
+                \"text\": \"✅ *Production Deployment Successful*\nEnvironment: *PRODUCTION*\"
+              }
+            ]
+          }" \
+          ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      # Notify Slack: Promote failed (rollback triggered)
+      - name: Slack - Promote Failed / Rollback Triggered
+        if: failure()
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+          --data "{
+            \"attachments\": [
+              {
+                \"color\": \"danger\",
+                \"text\": \"⚠️ *Production Deployment Failed*\n🔄 Rollback Triggered Automatically\nEnvironment: *PRODUCTION*\"
+              }
+            ]
+          }" \
+          ${{ secrets.SLACK_WEBHOOK_URL }}
