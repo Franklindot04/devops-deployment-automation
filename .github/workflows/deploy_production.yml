@@ -11,6 +11,26 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      # -----------------------------
+      # SLACK: Production Deploy Started
+      # -----------------------------
+      - name: Slack - Production Deploy Started
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+          --data @- ${{ secrets.SLACK_WEBHOOK_URL }} << 'EOF'
+          {
+            "blocks": [
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "🚀 *Production Deployment Started*\nRepository: devops-deployment-automation\nEnvironment: *PRODUCTION*"
+                }
+              }
+            ]
+          }
+          EOF
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -54,9 +74,67 @@ jobs:
             ec2-user@${{ secrets.EC2_PRODUCTION_HOST }}:/home/ec2-user/devops-deployment-automation/scripts/
 
       - name: SSH into production and deploy
+        id: deploy_step
         run: |
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > cicd_key
           chmod 600 cicd_key
 
           ssh -o StrictHostKeyChecking=no -i cicd_key ec2-user@${{ secrets.EC2_PRODUCTION_HOST }} \
             "cd devops-deployment-automation && ./scripts/deploy_production.sh"
+
+      # -----------------------------
+      # SLACK: Production Deploy Successful
+      # -----------------------------
+      - name: Slack - Production Deploy Successful
+        if: success()
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+          --data @- ${{ secrets.SLACK_WEBHOOK_URL }} << EOF
+          {
+            "blocks": [
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "✅ *Production Deployment Successful*\nEnvironment: *PRODUCTION*\nVersion: ${env.TAG}"
+                }
+              },
+              {
+                "type": "actions",
+                "elements": [
+                  {
+                    "type": "button",
+                    "text": {
+                      "type": "plain_text",
+                      "text": "Rollback Production"
+                    },
+                    "style": "danger",
+                    "value": "rollback_production",
+                    "action_id": "rollback_production"
+                  }
+                ]
+              }
+            ]
+          }
+          EOF
+
+      # -----------------------------
+      # SLACK: Production Deploy Failed
+      # -----------------------------
+      - name: Slack - Production Deploy Failed
+        if: failure()
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+          --data @- ${{ secrets.SLACK_WEBHOOK_URL }} << 'EOF'
+          {
+            "blocks": [
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "❌ *Production Deployment Failed*\nEnvironment: *PRODUCTION*"
+                }
+              }
+            ]
+          }
+          EOF
