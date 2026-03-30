@@ -19,15 +19,16 @@ jobs:
       - name: Slack - Staging Deploy Started
         run: |
           curl -X POST -H 'Content-type: application/json' \
-          --data "{
-            \"attachments\": [
+          --data @- ${{ secrets.SLACK_WEBHOOK_URL }} << 'EOF'
+          {
+            "attachments": [
               {
-                \"color\": \"#439FE0\",
-                \"text\": \"🚀 *Staging Deployment Started*\nRepository: devops-deployment-automation\nEnvironment: *STAGING*\"
+                "color": "#439FE0",
+                "text": "🚀 *Staging Deployment Started*\nRepository: devops-deployment-automation\nEnvironment: *STAGING*"
               }
             ]
-          }" \
-          ${{ secrets.SLACK_WEBHOOK_URL }}
+          }
+          EOF
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -47,7 +48,6 @@ jobs:
           docker tag myapp-staging:$VERSION ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.eu-north-1.amazonaws.com/myapp-staging:$VERSION
           docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.eu-north-1.amazonaws.com/myapp-staging:$VERSION
 
-      # ⭐ NEW: Commit updated version file back to GitHub
       - name: Commit updated version file
         run: |
           git config user.name "github-actions"
@@ -71,36 +71,38 @@ jobs:
         if: success()
         run: |
           curl -X POST -H 'Content-type: application/json' \
-          --data "{
-            \"attachments\": [
+          --data @- ${{ secrets.SLACK_WEBHOOK_URL }} << 'EOF'
+          {
+            "attachments": [
               {
-                \"color\": \"good\",
-                \"text\": \"✅ *Staging Deployment Successful*\nEnvironment: *STAGING*\",
-                \"actions\": [
+                "color": "good",
+                "text": "✅ *Staging Deployment Successful*\nEnvironment: *STAGING*",
+                "actions": [
                   {
-                    \"type\": \"button\",
-                    \"text\": \"Promote to Production\",
-                    \"style\": \"primary\",
-                    \"url\": \"https://fnqfa4zo91.execute-api.eu-north-1.amazonaws.com/slack\",
-                    \"value\": \"promote_to_production\"
+                    "type": "button",
+                    "text": "Promote to Production",
+                    "style": "primary",
+                    "url": "https://fnqfa4zo91.execute-api.eu-north-1.amazonaws.com/slack",
+                    "value": "promote_to_production"
                   }
                 ]
               }
             ]
-          }" \
-          ${{ secrets.SLACK_WEBHOOK_URL }}
+          }
+          EOF
 
       # Notify Slack: Staging deploy failed
       - name: Slack - Staging Deploy Failed
         if: failure()
         run: |
           curl -X POST -H 'Content-type: application/json' \
-          --data "{
-            \"attachments\": [
+          --data @- ${{ secrets.SLACK_WEBHOOK_URL }} << 'EOF'
+          {
+            "attachments": [
               {
-                \"color\": \"danger\",
-                \"text\": \"❌ *Staging Deployment Failed*\nEnvironment: *STAGING*\"
+                "color": "danger",
+                "text": "❌ *Staging Deployment Failed*\nEnvironment: *STAGING*"
               }
             ]
-          }" \
-          ${{ secrets.SLACK_WEBHOOK_URL }}
+          }
+          EOF
