@@ -15,7 +15,6 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      # Notify Slack: Staging deploy started
       - name: Slack - Staging Deploy Started
         run: |
           curl -X POST -H 'Content-type: application/json' \
@@ -64,9 +63,8 @@ jobs:
 
       - name: Deploy on staging EC2
         run: |
-          ssh -o StrictHostKeyChecking=no -i cicd_key ec2-user@${{ secrets.EC2_STAGING_HOST }} "cd devops-deployment-automation/scripts && ./deploy.sh"
+          ssh -o StrictHostKeyChecking=no -i cicd_key ec2-user@${{ secrets.EC2_STAGING_HOST }} "cd devops-deployment-automation/scripts && ./deploy_staging.sh"
 
-      # Notify Slack: Staging deploy success
       - name: Slack - Staging Deploy Success
         if: success()
         run: |
@@ -91,7 +89,6 @@ jobs:
           }
           EOF
 
-      # Notify Slack: Staging deploy failed
       - name: Slack - Staging Deploy Failed
         if: failure()
         run: |
