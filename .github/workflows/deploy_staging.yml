@@ -80,8 +80,8 @@ jobs:
                     "type": "button",
                     "text": "Promote to Production",
                     "style": "primary",
-                    "url": "https://fnqfa4zo91.execute-api.eu-north-1.amazonaws.com/slack",
                     "value": "promote_to_production"
+                    "action_id": "promote_to_production"
                   }
                 ]
               }
