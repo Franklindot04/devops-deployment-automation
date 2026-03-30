@@ -1,50 +1,72 @@
 #!/bin/bash
-
 set -e
 
-APP_NAME="myapp-production"
-ECR_URI="<YOUR_ECR_URI>"
-PORT_EXTERNAL=8080
-PORT_INTERNAL=80
+VERSION=$(cat last_version_production.txt)
+PREVIOUS_VERSION=$(cat previous_version_production.txt 2>/dev/null || echo "none")
 
-cd /home/ubuntu/devops-deployment-automation
+AWS_ACCOUNT_ID="787124622426"
+AWS_REGION="eu-north-1"
+ECR_REPO="myapp-production"
 
-LAST_VERSION=$(cat last_version_production.txt)
-PREVIOUS_VERSION=$(cat last_version_production.txt 2>/dev/null || echo "none")
+APP_MESSAGE="Hello from PRODUCTION!"
+APP_ENV="production"
 
-echo "$LAST_VERSION" > previous_version_production.txt
+echo "Deploying version: $VERSION"
+echo "Previous version: $PREVIOUS_VERSION"
+
+echo "Logging in to ECR..."
+aws ecr get-login-password --region $AWS_REGION \
+  | docker login --username AWS --password-stdin \
+    $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
 echo "Pulling new image..."
-docker pull $ECR_URI:$LAST_VERSION
+docker pull $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$VERSION
 
 echo "Stopping old container..."
-docker stop $APP_NAME || true
-docker rm $APP_NAME || true
+docker stop myapp || true
+docker rm myapp || true
+
+echo "Creating log directory..."
+sudo mkdir -p /var/log/myapp
+sudo chown ec2-user:ec2-user /var/log/myapp
 
 echo "Starting new container..."
-docker run -d \
-  -p $PORT_EXTERNAL:$PORT_INTERNAL \
-  --name $APP_NAME \
-  $ECR_URI:$LAST_VERSION
+docker run -d --name myapp \
+  -p 80:80 \
+  -v /var/log/myapp:/logs \
+  -e APP_MESSAGE="$APP_MESSAGE" \
+  -e APP_ENV="$APP_ENV" \
+  $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$VERSION
+
+echo "Waiting for app to start..."
+sleep 5
 
 echo "Running health check..."
-sleep 5
-STATUS=$(curl -s http://localhost:$PORT_EXTERNAL/health | grep -o "ok" || true)
+if curl -s http://localhost/health | grep -q "ok"; then
+    echo "Health check passed. Deployment successful."
+else
+    echo "Health check FAILED. Rolling back to previous version: $PREVIOUS_VERSION"
 
-if [ "$STATUS" != "ok" ]; then
-  echo "Health check failed. Rolling back..."
-  docker stop $APP_NAME
-  docker rm $APP_NAME
+    if [ "$PREVIOUS_VERSION" = "none" ]; then
+        echo "No previous version available. Cannot roll back."
+        exit 1
+    fi
 
-  if [ "$PREVIOUS_VERSION" != "none" ]; then
-    docker run -d \
-      -p $PORT_EXTERNAL:$PORT_INTERNAL \
-      --name $APP_NAME \
-      $ECR_URI:$PREVIOUS_VERSION
-  fi
+    echo "Pulling previous image..."
+    docker pull $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$PREVIOUS_VERSION
 
-  exit 1
+    echo "Stopping failed container..."
+    docker stop myapp || true
+    docker rm myapp || true
+
+    echo "Starting previous version..."
+    docker run -d --name myapp \
+      -p 80:80 \
+      $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$PREVIOUS_VERSION
+
+    echo "Rollback complete."
+    exit 1
 fi
 
-echo "Deployment successful!"
-echo "$LAST_VERSION" > last_version_production.txt
+echo "Updating version history..."
+echo $VERSION > previous_version_production.txt
