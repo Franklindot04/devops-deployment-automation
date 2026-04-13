@@ -12,6 +12,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Read previous version
+        id: version
+        run: |
+          VERSION=$(cat previous_version_production.txt)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
       - name: Slack - Rollback Started
         run: |
           curl -X POST -H 'Content-type: application/json' \
@@ -20,7 +26,7 @@ jobs:
             "attachments": [
               {
                 "color": "#FFA500",
-                "text": "🔄 *Rollback to Previous Production Version Started*"
+                "text": "🔄 *Rollback Started*\nTarget Version: ${{ steps.version.outputs.version }}"
               }
             ]
           }
@@ -45,7 +51,7 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > cicd_key
           chmod 600 cicd_key
           ssh -o StrictHostKeyChecking=no -i cicd_key ec2-user@${{ secrets.EC2_PRODUCTION_HOST }} \
-            "cd devops-deployment-automation/scripts && chmod +x rollback_production.sh && ./rollback_production.sh"
+            "cd devops-deployment-automation/scripts && VERSION=${{ steps.version.outputs.version }} ./rollback_production.sh"
 
       - name: Slack - Rollback Successful
         if: success()
