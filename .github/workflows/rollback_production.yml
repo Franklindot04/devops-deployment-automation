@@ -18,6 +18,19 @@ jobs:
           VERSION=$(cat previous_version_production.txt)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
+      - name: Read current version
+        id: current
+        run: |
+          CURRENT=$(cat last_version_production.txt)
+          echo "current=$CURRENT" >> $GITHUB_OUTPUT
+
+      - name: Safety Guard - Prevent rollback to same version
+        run: |
+          if [ "${{ steps.version.outputs.version }}" = "${{ steps.current.outputs.current }}" ]; then
+            echo "❌ Rollback blocked: current and previous versions are the same."
+            exit 1
+          fi
+
       - name: Slack - Rollback Started
         run: |
           curl -X POST -H 'Content-type: application/json' \
@@ -37,7 +50,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
+          aws-region: eu-north-1
 
       - name: Copy rollback script to EC2
         run: |

@@ -45,10 +45,10 @@ echo "Running health check..."
 if curl -s http://localhost/health | grep -q "ok"; then
     echo "Health check passed. Deployment successful."
 else
-    echo "Health check FAILED. Rolling back to previous version: $PREVIOUS_VERSION"
+    echo "❌ Health check FAILED. Rolling back to previous version: $PREVIOUS_VERSION"
 
     if [ "$PREVIOUS_VERSION" = "none" ]; then
-        echo "No previous version available. Cannot roll back."
+        echo "❌ No previous version available. Cannot roll back."
         exit 1
     fi
 

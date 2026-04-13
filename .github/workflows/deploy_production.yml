@@ -65,7 +65,7 @@ jobs:
           chmod 600 cicd_key
 
           scp -o StrictHostKeyChecking=no -i cicd_key last_version_production.txt \
-            ec2-user@${{ secrets.EC2_PRODUCTION_HOST }}:/home/ec2-user/devops-deployment-automation/scripts/
+            ec2-user@${{ secrets.EC2_PRODUCTION_HOST }}:/home/ec2-user/devops-deployment-automation/
 
       - name: SSH into production and deploy
         id: deploy_step
@@ -87,23 +87,11 @@ jobs:
                   \"type\": \"mrkdwn\",
                   \"text\": \"✅ *Production Deployment Successful*\\nEnvironment: *PRODUCTION*\\nVersion: ${{ env.TAG }}\"
                 }
-              },
-              {
-                \"type\": \"actions\",
-                \"elements\": [
-                  {
-                    \"type\": \"button\",
-                    \"text\": { \"type\": \"plain_text\", \"text\": \"Rollback Production\" },
-                    \"style\": \"danger\",
-                    \"value\": \"rollback_production\",
-                    \"action_id\": \"rollback_production\"
-                  }
-                ]
               }
             ]
           }" | curl -X POST -H "Content-type: application/json" --data @- ${{ secrets.SLACK_WEBHOOK_URL }}
 
-      - name: Slack - Production Deploy Failed
+      - name: Slack - Production Deploy Failed (Auto Rollback Triggered)
         if: failure()
         run: |
           echo '{
@@ -112,7 +100,7 @@ jobs:
                 "type": "section",
                 "text": {
                   "type": "mrkdwn",
-                  "text": "❌ *Production Deployment Failed*\nEnvironment: *PRODUCTION*"
+                  "text": "❌ *Production Deployment Failed*\nHealth check failed. Auto-rollback was triggered on EC2."
                 }
               }
             ]
