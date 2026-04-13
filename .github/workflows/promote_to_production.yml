@@ -34,11 +34,18 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: eu-north-1
 
-      - name: Read staging version
+      - name: Read staging version and update production version files
         id: version
         run: |
           VERSION=$(cat last_version_staging.txt)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          # Save previous production version BEFORE overwriting
+          if [ -f last_version_production.txt ]; then
+            cp last_version_production.txt previous_version_production.txt
+          fi
+
+          # Write new production version
           echo $VERSION > last_version_production.txt
 
       - name: Retag and push production image
