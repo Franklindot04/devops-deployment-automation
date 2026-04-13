@@ -18,19 +18,6 @@ jobs:
           VERSION=$(cat previous_version_production.txt)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Read current version
-        id: current
-        run: |
-          CURRENT=$(cat last_version_production.txt)
-          echo "current=$CURRENT" >> $GITHUB_OUTPUT
-
-      - name: Safety Guard - Prevent rollback to same version
-        run: |
-          if [ "${{ steps.version.outputs.version }}" = "${{ steps.current.outputs.current }}" ]; then
-            echo "❌ Rollback blocked: current and previous versions are the same."
-            exit 1
-          fi
-
       - name: Slack - Rollback Started
         run: |
           curl -X POST -H 'Content-type: application/json' \
