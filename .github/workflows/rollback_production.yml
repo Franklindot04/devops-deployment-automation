@@ -1,0 +1,72 @@
+name: Rollback Production
+
+on:
+  repository_dispatch:
+    types: [rollback_production]
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Slack - Rollback Started
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+          --data @- ${{ secrets.SLACK_WEBHOOK_URL }} << 'EOF'
+          {
+            "attachments": [
+              {
+                "color": "#FFA500",
+                "text": "🔄 *Rollback to Previous Production Version Started*"
+              }
+            ]
+          }
+          EOF
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-north-1
+
+      - name: SSH into production and rollback
+        run: |
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > cicd_key
+          chmod 600 cicd_key
+
+          ssh -o StrictHostKeyChecking=no -i cicd_key ec2-user@${{ secrets.EC2_PRODUCTION_HOST }} \
+            "cd devops-deployment-automation/scripts && ./rollback_production.sh"
+
+      - name: Slack - Rollback Successful
+        if: success()
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+          --data @- ${{ secrets.SLACK_WEBHOOK_URL }} << 'EOF'
+          {
+            "attachments": [
+              {
+                "color": "good",
+                "text": "✅ *Rollback Completed Successfully*"
+              }
+            ]
+          }
+          EOF
+
+      - name: Slack - Rollback Failed
+        if: failure()
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+          --data @- ${{ secrets.SLACK_WEBHOOK_URL }} << 'EOF'
+          {
+            "attachments": [
+              {
+                "color": "danger",
+                "text": "❌ *Rollback Failed*"
+              }
+            ]
+          }
+          EOF
