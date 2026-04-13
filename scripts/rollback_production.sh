@@ -32,14 +32,6 @@ ssh -o StrictHostKeyChecking=no -i ~/.ssh/groundnut.pem ec2-user@16.171.41.129 <
     -p 80:80 \
     -v /var/log/myapp:/logs \
     $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$PREVIOUS_VERSION
-
-  - name: Copy rollback script to EC2
-  run: |
-    echo "${{ secrets.SSH_PRIVATE_KEY }}" > cicd_key
-    chmod 600 cicd_key
-    scp -o StrictHostKeyChecking=no -i cicd_key scripts/rollback_production.sh \
-      ec2-user@${{ secrets.EC2_PRODUCTION_HOST }}:/home/ec2-user/devops-deployment-automation/scripts/
-
 EOF
 
 echo "✅ Rollback to version $PREVIOUS_VERSION complete."

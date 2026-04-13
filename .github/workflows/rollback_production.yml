@@ -31,15 +31,21 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: eu-north-1
+          aws-region: us-east-1
 
-      - name: SSH into production and rollback
+      - name: Copy rollback script to EC2
         run: |
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > cicd_key
           chmod 600 cicd_key
+          scp -o StrictHostKeyChecking=no -i cicd_key scripts/rollback_production.sh \
+            ec2-user@${{ secrets.EC2_PRODUCTION_HOST }}:/home/ec2-user/devops-deployment-automation/scripts/
 
+      - name: Run rollback on EC2
+        run: |
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > cicd_key
+          chmod 600 cicd_key
           ssh -o StrictHostKeyChecking=no -i cicd_key ec2-user@${{ secrets.EC2_PRODUCTION_HOST }} \
-            "cd devops-deployment-automation/scripts && ./rollback_production.sh"
+            "cd devops-deployment-automation/scripts && chmod +x rollback_production.sh && ./rollback_production.sh"
 
       - name: Slack - Rollback Successful
         if: success()
