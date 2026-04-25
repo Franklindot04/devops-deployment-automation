@@ -10,7 +10,7 @@ A fully automated, stateless CI/CD pipeline for deploying a Dockerized applicati
 - **Version History + Rollback**
 - **Staging → Production Promotion**
 
-This project demonstrates real‑world DevOps engineering with production‑grade patterns, auditability, and Slack‑driven deployment control.
+This project demonstrates real‑world DevOps engineering with production‑grade patterns, auditability and Slack‑driven deployment control.
 
 ---
 
@@ -26,7 +26,7 @@ This project demonstrates real‑world DevOps engineering with production‑grad
 
 # 🚀 Architecture Overview
 
-## Mermaid Diagram
+## CI/CD Pipeline Architecture
 
 ```mermaid
 flowchart TD
@@ -48,7 +48,7 @@ F --> K[Rollback Workflows]
 K --> L[EC2 Rollback Script]
 ```
 
-## ASCII Diagram
+## CI/CD Pipeline Architecture
 
 ```
 Developer
