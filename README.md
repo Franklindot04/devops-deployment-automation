@@ -14,29 +14,57 @@ This project demonstrates real‑world DevOps engineering with production‑grad
 
 ---
 
-## 🚀 Architecture Overview
+# 📛 Badges
 
-```
-Developer → GitHub → GitHub Actions → AWS ECR → EC2 Deployment Script
-                                     ↓
-                                   Slack
-                                     ↓
-                               Lambda (index.js)
-                                     ↓
-                          GitHub repository_dispatch
-```
-
-### Key Components
-- **Staging Deploy** → triggered on push to `main`
-- **Promote to Production** → triggered via Slack button
-- **Production Deploy** → manual or automated
-- **Rollback Preview** → Slack interactive confirmation
-- **Rollback Confirm/Cancel** → Slack → Lambda → GitHub → EC2
-- **Version History** → stored in version files
+![CI/CD](https://img.shields.io/badge/GitHub%20Actions-CI%2FCD-blue)
+![AWS](https://img.shields.io/badge/AWS-EC2%20%7C%20ECR-orange)
+![Slack](https://img.shields.io/badge/Slack-Interactive%20Buttons-4A154B)
+![Docker](https://img.shields.io/badge/Docker-Containerized-blue)
+![Status](https://img.shields.io/badge/Status-Production--Ready-brightgreen)
 
 ---
 
-## 🛠️ Technologies Used
+# 🚀 Architecture Overview
+
+## Mermaid Diagram
+
+```mermaid
+flowchart TD
+
+A[Developer Push] --> B[GitHub Actions]
+B --> C[ECR - Staging Image]
+C --> D[EC2 Staging Deploy]
+
+D -->|Promote Button| E[Slack]
+E --> F[Lambda Handler]
+F --> G[GitHub repository_dispatch]
+G --> H[Promote to Production Workflow]
+H --> I[ECR - Production Image]
+I --> J[EC2 Production Deploy]
+
+J -->|Rollback Button| E
+E --> F
+F --> K[Rollback Workflows]
+K --> L[EC2 Rollback Script]
+```
+
+## ASCII Diagram
+
+```
+Developer
+   ↓
+GitHub → GitHub Actions → AWS ECR → EC2 Deployment Script
+                         ↓
+                       Slack
+                         ↓
+                   Lambda (index.js)
+                         ↓
+                GitHub repository_dispatch
+```
+
+---
+
+# 🛠️ Technologies Used
 
 - GitHub Actions (CI/CD)
 - AWS ECR (container registry)
@@ -49,7 +77,7 @@ Developer → GitHub → GitHub Actions → AWS ECR → EC2 Deployment Script
 
 ---
 
-## 🗂️ Repository Structure
+# 🗂️ Repository Structure
 
 ```
 .github/workflows/
@@ -79,7 +107,7 @@ version files:
 
 ---
 
-## 🧩 Slack Integration (Phase‑2)
+# 🧩 Slack Integration (Phase‑2)
 
 Slack is the control plane for production operations.
 
@@ -99,7 +127,7 @@ This ensures **no accidental rollbacks** and full auditability.
 
 ---
 
-## 🗂️ Version History
+# 🗂️ Version History
 
 Two files track production versions:
 
@@ -114,7 +142,7 @@ Rollback always targets the previous version.
 
 ---
 
-## 🔄 How Rollback Works
+# 🔄 How Rollback Works
 
 1. User clicks **Rollback Production** in Slack  
 2. Lambda triggers `rollback_preview.yml`  
@@ -133,7 +161,7 @@ This provides **safe, controlled, auditable rollbacks**.
 
 ---
 
-## ⚙️ Workflows
+# ⚙️ Workflows
 
 ### 1. deploy_staging.yml
 Triggered on push to `main`:
@@ -200,7 +228,7 @@ Executes the actual rollback on EC2.
 
 ---
 
-## 🧠 Lambda (index.js)
+# 🧠 Lambda (index.js)
 
 Handles Slack interactive actions:
 
@@ -213,7 +241,7 @@ Sends GitHub repository_dispatch events.
 
 ---
 
-## 🖥️ EC2 Deployment Scripts
+# 🖥️ EC2 Deployment Scripts
 
 Located in:
 
@@ -233,7 +261,7 @@ These scripts run directly on EC2.
 
 ---
 
-## 🔐 Security Considerations
+# 🔐 Security Considerations
 
 - All secrets stored in GitHub Actions → **encrypted at rest**
 - SSH private key stored as a GitHub secret
@@ -246,7 +274,7 @@ These scripts run directly on EC2.
 
 ---
 
-## 🧪 Testing Phase‑2 (Confirm/Cancel)
+# 🧪 Testing Phase‑2 (Confirm/Cancel)
 
 We test in this exact order:
 
@@ -262,19 +290,70 @@ Everything should work end‑to‑end.
 
 ---
 
-## 🧹 AWS Shutdown Steps (to stop billing)
+# 🔧 Troubleshooting
 
-1. Terminate EC2 instances  
-2. Delete ECR repositories  
-3. Remove IAM user/role used for CI/CD  
-4. Remove Lambda + API Gateway  
-5. Remove unused security groups  
+### ❌ Rollback fails with “manifest not found”
+Cause: Wrong ECR region or repo name in rollback script  
+Fix: Ensure rollback script uses:
 
-This stops all AWS charges.
+```
+eu-north-1
+myapp-production
+```
 
 ---
 
-## 🏁 Project Status
+### ❌ Slack buttons not responding
+Cause: Lambda token expired or wrong  
+Fix: Update `GITHUB_TOKEN` in Lambda environment variables.
+
+---
+
+### ❌ Version history not syncing
+Cause: Version files not committed back to GitHub  
+Fix: Ensure both deploy + promote workflows include:
+
+```
+git commit -m "chore: update version files [skip ci]"
+```
+
+---
+
+# 🔄 Relaunch From Scratch (Full Reset)
+
+To rebuild the entire system:
+
+1. Create new EC2 instances (staging + production)  
+2. Create new ECR repos:
+   - `myapp-staging`
+   - `myapp-production`
+3. Recreate IAM user with:
+   - ECR push/pull
+   - EC2 SSH
+4. Recreate Lambda + API Gateway  
+5. Add secrets to GitHub Actions  
+6. Push code → pipeline auto‑rebuilds itself  
+
+---
+
+# ⭐ Why This Project Matters
+
+This project demonstrates:
+
+- Real‑world CI/CD automation  
+- Slack‑driven deployment control  
+- Safe, auditable rollbacks  
+- Stateless deployment architecture  
+- GitHub Actions + AWS integration  
+- Production‑grade DevOps patterns  
+- Version history + rollback logic  
+- Multi‑environment promotion flow  
+
+This is the kind of system used in **actual companies**.
+
+---
+
+# 🏁 Project Status
 
 Phase‑2 (Confirm/Cancel Rollback) — **COMPLETE**  
 Slack → Lambda → GitHub → EC2 — **Fully operational**  
