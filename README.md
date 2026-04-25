@@ -237,7 +237,7 @@ Once testing is complete:
 
 ### 5. Remove unused security groups
 
-This stops all AWS charges.
+This stops all AWS charges
 
 ---
 
