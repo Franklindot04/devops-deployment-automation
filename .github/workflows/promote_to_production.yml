@@ -78,13 +78,30 @@ jobs:
       - name: Slack - Promote Success
         if: success()
         run: |
+          VERSION=${{ steps.version.outputs.version }}
+
           curl -X POST -H 'Content-type: application/json' \
-          --data @- ${{ secrets.SLACK_WEBHOOK_URL }} << 'EOF'
+          --data @- ${{ secrets.SLACK_WEBHOOK_URL }} << EOF
           {
-            "attachments": [
+            "blocks": [
               {
-                "color": "good",
-                "text": "✅ *Production Deployment Successful*\nEnvironment: *PRODUCTION*"
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "✅ *Production Deployment Successful*\nEnvironment: *PRODUCTION*\nVersion: \`$VERSION\`"
+                }
+              },
+              {
+                "type": "actions",
+                "elements": [
+                  {
+                    "type": "button",
+                    "text": { "type": "plain_text", "text": "Rollback Production" },
+                    "style": "danger",
+                    "value": "rollback_production",
+                    "action_id": "rollback_production"
+                  }
+                ]
               }
             ]
           }
