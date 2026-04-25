@@ -1,15 +1,16 @@
 # DevOps Deployment Automation — Production‑Grade CI/CD with Slack Control
 
-A fully automated, stateless CI/CD pipeline for deploying a Python application to AWS EC2 using:
+A fully automated, stateless CI/CD pipeline for deploying a Dockerized application to AWS EC2 using:
 
 - **GitHub Actions**
 - **AWS ECR + EC2**
+- **Shell scripting (Bash)**
 - **Slack interactive buttons**
-- **Lambda + API Gateway**
+- **AWS Lambda + API Gateway**
 - **Version History + Rollback**
 - **Staging → Production Promotion**
 
-This project demonstrates real‑world DevOps engineering with production‑grade patterns, auditability and Slack‑driven deployment control.
+This project demonstrates real‑world DevOps engineering with production‑grade patterns, auditability, and Slack‑driven deployment control.
 
 ---
 
