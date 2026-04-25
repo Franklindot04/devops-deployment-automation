@@ -1,0 +1,69 @@
+name: Rollback Confirm
+
+on:
+  repository_dispatch:
+    types: [rollback_confirm]
+
+jobs:
+  confirm:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Read version files
+        id: versions
+        run: |
+          CURRENT=$(cat last_version_production.txt)
+          PREVIOUS=$(cat previous_version_production.txt)
+
+          echo "current=$CURRENT" >> $GITHUB_OUTPUT
+          echo "previous=$PREVIOUS" >> $GITHUB_OUTPUT
+
+      - name: Slack - Rollback Confirmed
+        run: |
+          CURRENT="${{ steps.versions.outputs.current }}"
+          PREVIOUS="${{ steps.versions.outputs.previous }}"
+
+          curl -X POST -H "Content-type: application/json" \
+          --data @- ${{ secrets.SLACK_WEBHOOK_URL }} << EOF
+          {
+            "blocks": [
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "🔄 *Rollback Confirmed*\n\nRolling back from \`$CURRENT\` → \`$PREVIOUS\`"
+                }
+              }
+            ]
+          }
+          EOF
+
+      - name: Trigger Internal Rollback Workflow
+        run: |
+          curl -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/Franklindot04/devops-deployment-automation/dispatches \
+            -d '{"event_type": "rollback_production_internal"}'
+
+      - name: Slack - Rollback Completed (Version History)
+        run: |
+          PREVIOUS="${{ steps.versions.outputs.previous }}"
+
+          curl -X POST -H "Content-type: application/json" \
+          --data @- ${{ secrets.SLACK_WEBHOOK_URL }} << EOF
+          {
+            "blocks": [
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "📜 *Rollback Completed*\n\nProduction is now running version: \`$PREVIOUS\`"
+                }
+              }
+            ]
+          }
+          EOF

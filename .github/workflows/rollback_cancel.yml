@@ -1,0 +1,27 @@
+name: Rollback Cancel
+
+on:
+  repository_dispatch:
+    types: [rollback_cancel]
+
+jobs:
+  cancel:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Send Slack Rollback Cancelled Message
+        run: |
+          curl -X POST -H "Content-type: application/json" \
+          --data @- ${{ secrets.SLACK_WEBHOOK_URL }} << EOF
+          {
+            "blocks": [
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "❎ *Rollback Cancelled*\nNo changes were made to the production environment."
+                }
+              }
+            ]
+          }
+          EOF

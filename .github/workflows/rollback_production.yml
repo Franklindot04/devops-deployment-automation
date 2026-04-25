@@ -1,8 +1,8 @@
-name: Rollback Production
+name: Internal Rollback Production
 
 on:
   repository_dispatch:
-    types: [rollback_production]
+    types: [rollback_production_internal]
 
 jobs:
   rollback:
@@ -17,20 +17,6 @@ jobs:
         run: |
           VERSION=$(cat previous_version_production.txt)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Slack - Rollback Started
-        run: |
-          curl -X POST -H 'Content-type: application/json' \
-          --data @- ${{ secrets.SLACK_WEBHOOK_URL }} << 'EOF'
-          {
-            "attachments": [
-              {
-                "color": "#FFA500",
-                "text": "🔄 *Rollback Started*\nTarget Version: ${{ steps.version.outputs.version }}"
-              }
-            ]
-          }
-          EOF
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -52,33 +38,3 @@ jobs:
           chmod 600 cicd_key
           ssh -o StrictHostKeyChecking=no -i cicd_key ec2-user@${{ secrets.EC2_PRODUCTION_HOST }} \
             "cd devops-deployment-automation/scripts && VERSION=${{ steps.version.outputs.version }} ./rollback_production.sh"
-
-      - name: Slack - Rollback Successful
-        if: success()
-        run: |
-          curl -X POST -H 'Content-type: application/json' \
-          --data @- ${{ secrets.SLACK_WEBHOOK_URL }} << 'EOF'
-          {
-            "attachments": [
-              {
-                "color": "good",
-                "text": "✅ *Rollback Completed Successfully*"
-              }
-            ]
-          }
-          EOF
-
-      - name: Slack - Rollback Failed
-        if: failure()
-        run: |
-          curl -X POST -H 'Content-type: application/json' \
-          --data @- ${{ secrets.SLACK_WEBHOOK_URL }} << 'EOF'
-          {
-            "attachments": [
-              {
-                "color": "danger",
-                "text": "❌ *Rollback Failed*"
-              }
-            ]
-          }
-          EOF

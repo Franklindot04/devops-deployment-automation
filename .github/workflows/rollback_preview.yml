@@ -1,0 +1,61 @@
+name: Rollback Preview
+
+on:
+  repository_dispatch:
+    types: [rollback_preview]
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Read version files
+        id: versions
+        run: |
+          CURRENT=$(cat last_version_production.txt)
+          PREVIOUS=$(cat previous_version_production.txt)
+
+          echo "current=$CURRENT" >> $GITHUB_OUTPUT
+          echo "previous=$PREVIOUS" >> $GITHUB_OUTPUT
+
+      - name: Send Slack Rollback Preview
+        run: |
+          CURRENT="${{ steps.versions.outputs.current }}"
+          PREVIOUS="${{ steps.versions.outputs.previous }}"
+
+          curl -X POST -H "Content-type: application/json" \
+          --data @- ${{ secrets.SLACK_WEBHOOK_URL }} << EOF
+          {
+            "blocks": [
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "⚠️ *Rollback Preview*\n\n*Current Version:* \`$CURRENT\`\n*Target Version:* \`$PREVIOUS\`\n\nAre you sure you want to roll back?"
+                }
+              },
+              {
+                "type": "actions",
+                "elements": [
+                  {
+                    "type": "button",
+                    "text": { "type": "plain_text", "text": "Confirm Rollback" },
+                    "style": "danger",
+                    "value": "rollback_confirm",
+                    "action_id": "rollback_confirm"
+                  },
+                  {
+                    "type": "button",
+                    "text": { "type": "plain_text", "text": "Cancel" },
+                    "style": "primary",
+                    "value": "rollback_cancel",
+                    "action_id": "rollback_cancel"
+                  }
+                ]
+              }
+            ]
+          }
+          EOF

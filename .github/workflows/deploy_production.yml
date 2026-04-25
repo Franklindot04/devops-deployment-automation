@@ -58,13 +58,25 @@ jobs:
           docker push \
             "$ACCOUNT_ID.dkr.ecr.eu-north-1.amazonaws.com/myapp-production:${{ env.TAG }}"
 
-      - name: Copy version file to EC2
+      - name: Update version files (Version History)
         run: |
+          # Save previous version
+          if [ -f last_version_production.txt ]; then
+            cp last_version_production.txt previous_version_production.txt
+          fi
+
+          # Write new version
           echo "${{ env.TAG }}" > last_version_production.txt
+
+      - name: Copy version files to EC2
+        run: |
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > cicd_key
           chmod 600 cicd_key
 
           scp -o StrictHostKeyChecking=no -i cicd_key last_version_production.txt \
+            ec2-user@${{ secrets.EC2_PRODUCTION_HOST }}:/home/ec2-user/devops-deployment-automation/
+
+          scp -o StrictHostKeyChecking=no -i cicd_key previous_version_production.txt \
             ec2-user@${{ secrets.EC2_PRODUCTION_HOST }}:/home/ec2-user/devops-deployment-automation/
 
       - name: SSH into production and deploy
@@ -79,13 +91,15 @@ jobs:
       - name: Slack - Production Deploy Successful
         if: success()
         run: |
+          VERSION=${{ env.TAG }}
+
           echo "{
             \"blocks\": [
               {
                 \"type\": \"section\",
                 \"text\": {
                   \"type\": \"mrkdwn\",
-                  \"text\": \"✅ *Production Deployment Successful*\\nEnvironment: *PRODUCTION*\\nVersion: ${{ env.TAG }}\"
+                  \"text\": \"✅ *Production Deployment Successful*\\nEnvironment: *PRODUCTION*\\nVersion: \`$VERSION\`\"
                 }
               },
               {
