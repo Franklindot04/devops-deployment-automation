@@ -48,6 +48,17 @@ jobs:
           # Write new production version
           echo $VERSION > last_version_production.txt
 
+      - name: Commit updated version files
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+
+          git add last_version_production.txt previous_version_production.txt
+
+          git commit -m "chore: update production version files [skip ci]" || echo "No changes to commit"
+
+          git push    
+
       - name: Retag and push production image
         run: |
           VERSION=${{ steps.version.outputs.version }}
